@@ -79,15 +79,33 @@ jobs:
               cd /work/onnxruntime-src
 
               echo "========== BUILD ONNX RUNTIME =========="
-              ./build.sh \
-              --config Release \
-              --build_dir /work/onnxruntime-build \
-              --build_shared_lib \
-              --build_java \
-              --parallel 2 \
-              --skip_tests \
-              --compile_no_warning_as_error \
-              --allow_running_as_root
+               set +e
+
+          ./build.sh \
+          --config Release \
+          --build_dir /work/onnxruntime-build \
+          --build_shared_lib \
+          --build_java \
+          --parallel 1 \
+          --skip_tests \
+          --compile_no_warning_as_error \
+          --allow_running_as_root \
+          2>&1 | tee /work/out/build-onnxruntime.log
+
+          BUILD_EXIT=${PIPESTATUS[0]}
+
+          echo "========== BUILD EXIT CODE =========="
+          echo "$BUILD_EXIT"
+
+          if [ "$BUILD_EXIT" -ne 0 ]; then
+            echo "========== FIRST BUILD ERRORS =========="
+            grep -nEi "fatal error:|error:|undefined reference|killed|no such file|cannot find|collect2:" \
+          /work/out/build-onnxruntime.log | head -80 || true
+
+          exit "$BUILD_EXIT"
+          fi
+
+          set -e
 
               echo "========== FIND RESULT =========="
 
@@ -203,9 +221,10 @@ jobs:
               ls -lh /work/out
             '
 
-      - name: Upload ONNX Runtime native libraries
+      - name: Upload ONNX Runtime build files
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: onnxruntime120-glibc217
-          path: out/
-          if-no-files-found: error
+         name: onnxruntime120-glibc217
+         path: out/
+         if-no-files-found: warn
