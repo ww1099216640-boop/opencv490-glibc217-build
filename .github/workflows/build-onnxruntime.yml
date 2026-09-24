@@ -58,13 +58,14 @@ jobs:
 
               echo "========== BUILD ONNX RUNTIME =========="
               ./build.sh \
-                --config Release \
-                --build_dir /work/onnxruntime-build \
-                --build_shared_lib \
-                --build_java \
-                --parallel 2 \
-                --skip_tests \
-                --compile_no_warning_as_error
+              --config Release \
+              --build_dir /work/onnxruntime-build \
+              --build_shared_lib \
+              --build_java \
+              --parallel 2 \
+              --skip_tests \
+              --compile_no_warning_as_error \
+              --allow_running_as_root
 
               echo "========== FIND RESULT =========="
 
