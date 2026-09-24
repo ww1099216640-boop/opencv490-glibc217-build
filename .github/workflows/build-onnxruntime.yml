@@ -1,0 +1,188 @@
+name: Build ONNX Runtime 1.20.0 for GLIBC 2.17
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build ONNX Runtime 1.20.0 in manylinux2014
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          rm -rf "$GITHUB_WORKSPACE/out"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work \
+            quay.io/pypa/manylinux2014_x86_64 \
+            bash -lc '
+              set -euxo pipefail
+
+              echo "========== INSTALL BUILD TOOLS =========="
+              yum install -y git java-11-openjdk-devel zip unzip which binutils
+
+              export JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+              export PATH=/opt/python/cp311-cp311/bin:/opt/rh/devtoolset-10/root/usr/bin:$JAVA_HOME/bin:$PATH
+              export LD_LIBRARY_PATH=/opt/rh/devtoolset-10/root/usr/lib64:/opt/rh/devtoolset-10/root/usr/lib:${LD_LIBRARY_PATH:-}
+
+              python -m pip install --no-cache-dir cmake==3.28.3 ninja==1.11.1.1
+
+              echo "========== BUILD ENVIRONMENT =========="
+              ldd --version | head -1
+              gcc --version | head -1
+              g++ --version | head -1
+              java -version
+              cmake --version | head -1
+              uname -m
+
+              echo "========== DOWNLOAD ONNX RUNTIME =========="
+              rm -rf /work/onnxruntime-src
+              rm -rf /work/onnxruntime-build
+
+              git clone \
+                --branch v1.20.0 \
+                --depth 1 \
+                https://github.com/microsoft/onnxruntime.git \
+                /work/onnxruntime-src
+
+              cd /work/onnxruntime-src
+
+              echo "========== BUILD ONNX RUNTIME =========="
+              ./build.sh \
+                --config Release \
+                --build_dir /work/onnxruntime-build \
+                --build_shared_lib \
+                --build_java \
+                --parallel 2 \
+                --skip_tests \
+                --compile_no_warning_as_error
+
+              echo "========== FIND RESULT =========="
+
+              ORT_SO=$(find /work/onnxruntime-build -name "libonnxruntime.so" | head -1)
+              JNI_SO=$(find /work/onnxruntime-build -name "libonnxruntime4j_jni.so" | head -1)
+
+              echo "ORT_SO=$ORT_SO"
+              echo "JNI_SO=$JNI_SO"
+
+              if [ -z "$ORT_SO" ]; then
+                echo "libonnxruntime.so NOT FOUND"
+                exit 1
+              fi
+
+              if [ -z "$JNI_SO" ]; then
+                echo "libonnxruntime4j_jni.so NOT FOUND"
+                exit 1
+              fi
+
+              cp -L "$ORT_SO" /work/out/libonnxruntime.so
+              cp -L "$JNI_SO" /work/out/libonnxruntime4j_jni.so
+
+              echo "========== FILE INFO =========="
+              {
+                file /work/out/libonnxruntime.so
+                file /work/out/libonnxruntime4j_jni.so
+              } | tee /work/out/file-info.txt
+
+              echo "========== LDD =========="
+              {
+                echo "===== libonnxruntime.so ====="
+                ldd /work/out/libonnxruntime.so || true
+                echo
+                echo "===== libonnxruntime4j_jni.so ====="
+                ldd /work/out/libonnxruntime4j_jni.so || true
+              } | tee /work/out/ldd.txt
+
+              echo "========== NEEDED LIBRARIES =========="
+              {
+                echo "===== libonnxruntime.so ====="
+                readelf -d /work/out/libonnxruntime.so | grep NEEDED || true
+                echo
+                echo "===== libonnxruntime4j_jni.so ====="
+                readelf -d /work/out/libonnxruntime4j_jni.so | grep NEEDED || true
+              } | tee /work/out/needed-libraries.txt
+
+              echo "========== GLIBC =========="
+              {
+                echo "===== libonnxruntime.so ====="
+                strings /work/out/libonnxruntime.so \
+                  | grep -oE "GLIBC_[0-9]+(\.[0-9]+)*" \
+                  | sort -Vu || true
+
+                echo
+                echo "===== libonnxruntime4j_jni.so ====="
+                strings /work/out/libonnxruntime4j_jni.so \
+                  | grep -oE "GLIBC_[0-9]+(\.[0-9]+)*" \
+                  | sort -Vu || true
+              } | tee /work/out/glibc-versions.txt
+
+              echo "========== GLIBCXX =========="
+              {
+                echo "===== libonnxruntime.so ====="
+                strings /work/out/libonnxruntime.so \
+                  | grep -oE "GLIBCXX_[0-9]+(\.[0-9]+)*" \
+                  | sort -Vu || true
+
+                echo
+                echo "===== libonnxruntime4j_jni.so ====="
+                strings /work/out/libonnxruntime4j_jni.so \
+                  | grep -oE "GLIBCXX_[0-9]+(\.[0-9]+)*" \
+                  | sort -Vu || true
+              } | tee /work/out/glibcxx-versions.txt
+
+              echo "========== CXXABI =========="
+              {
+                echo "===== libonnxruntime.so ====="
+                strings /work/out/libonnxruntime.so \
+                  | grep -oE "CXXABI_[0-9]+(\.[0-9]+)*" \
+                  | sort -Vu || true
+
+                echo
+                echo "===== libonnxruntime4j_jni.so ====="
+                strings /work/out/libonnxruntime4j_jni.so \
+                  | grep -oE "CXXABI_[0-9]+(\.[0-9]+)*" \
+                  | sort -Vu || true
+              } | tee /work/out/cxxabi-versions.txt
+
+              echo "========== CHECK GLIBC MAX =========="
+
+              MAX_GLIBC=$(
+                strings /work/out/libonnxruntime.so /work/out/libonnxruntime4j_jni.so \
+                  | grep -oE "GLIBC_[0-9]+(\.[0-9]+)*" \
+                  | sed "s/GLIBC_//" \
+                  | sort -Vu \
+                  | tail -1
+              )
+
+              echo "MAX_GLIBC=$MAX_GLIBC" | tee /work/out/max-glibc.txt
+
+              if [ "$(printf "%s\n%s\n" "$MAX_GLIBC" "2.17" | sort -V | tail -1)" != "2.17" ]; then
+                echo "ERROR: GLIBC requirement is higher than 2.17"
+                exit 1
+              fi
+
+              echo "========== SHA256 =========="
+              sha256sum \
+                /work/out/libonnxruntime.so \
+                /work/out/libonnxruntime4j_jni.so \
+                | tee /work/out/sha256.txt
+
+              echo "========== BUILD SUCCESS =========="
+              ls -lh /work/out
+            '
+
+      - name: Upload ONNX Runtime native libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnxruntime120-glibc217
+          path: out/
+          if-no-files-found: error
