@@ -37,7 +37,7 @@ jobs:
                 gcc-c++ \
                 make
 
-              /opt/python/cp311-cp311/bin/python -m pip install cmake==3.27.9
+              /opt/python/cp311-cp311/bin/python -m pip install cmake==3.27.9 numpy==1.26.4
               export PATH=/opt/python/cp311-cp311/bin:$PATH
 
               export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
@@ -64,6 +64,9 @@ jobs:
                 -DCMAKE_BUILD_TYPE=Release \
                 -DBUILD_SHARED_LIBS=OFF \
                 -DBUILD_JAVA=ON \
+                -DBUILD_opencv_java=ON \
+                -DBUILD_opencv_java_bindings_generator=ON \
+                -DPython3_EXECUTABLE=/opt/python/cp311-cp311/bin/python \
                 -DBUILD_TESTS=OFF \
                 -DBUILD_PERF_TESTS=OFF \
                 -DBUILD_EXAMPLES=OFF \
@@ -71,7 +74,7 @@ jobs:
                 -DBUILD_DOCS=OFF \
                 -DBUILD_opencv_python2=OFF \
                 -DBUILD_opencv_python3=OFF \
-                -DBUILD_LIST=core,imgproc,imgcodecs \
+                -DBUILD_LIST=core,imgproc,imgcodecs,java \
                 -DWITH_IPP=OFF \
                 -DWITH_OPENCL=OFF \
                 -DWITH_FFMPEG=OFF \
