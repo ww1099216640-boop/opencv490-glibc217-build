@@ -1,0 +1,121 @@
+name: Build OpenCV 4.9 for GLIBC 2.17
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build OpenCV 4.9
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p "$GITHUB_WORKSPACE/out"
+
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work \
+            quay.io/pypa/manylinux2014_x86_64:latest \
+            bash -lc '
+              set -euxo pipefail
+
+              echo "========== SYSTEM =========="
+              cat /etc/redhat-release || true
+              ldd --version | head -1
+              uname -m
+
+              echo "========== INSTALL TOOLS =========="
+              yum install -y \
+                java-1.8.0-openjdk-devel \
+                ant \
+                unzip \
+                curl \
+                gcc \
+                gcc-c++ \
+                make
+
+              /opt/python/cp311-cp311/bin/python -m pip install cmake==3.27.9
+              export PATH=/opt/python/cp311-cp311/bin:$PATH
+
+              export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))
+              export PATH=$JAVA_HOME/bin:$PATH
+
+              echo "JAVA_HOME=$JAVA_HOME"
+              java -version
+              javac -version
+              ant -version
+              cmake --version
+
+              echo "========== DOWNLOAD OPENCV 4.9.0 =========="
+              curl -fL --retry 5 \
+                -o opencv.zip \
+                https://github.com/opencv/opencv/archive/refs/tags/4.9.0.zip
+
+              unzip -q opencv.zip
+
+              mkdir -p build
+              cd build
+
+              echo "========== CONFIGURE =========="
+              cmake ../opencv-4.9.0 \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DBUILD_JAVA=ON \
+                -DBUILD_TESTS=OFF \
+                -DBUILD_PERF_TESTS=OFF \
+                -DBUILD_EXAMPLES=OFF \
+                -DBUILD_opencv_apps=OFF \
+                -DBUILD_DOCS=OFF \
+                -DBUILD_opencv_python2=OFF \
+                -DBUILD_opencv_python3=OFF \
+                -DBUILD_LIST=core,imgproc,imgcodecs \
+                -DWITH_IPP=OFF \
+                -DWITH_OPENCL=OFF \
+                -DWITH_FFMPEG=OFF \
+                -DWITH_GSTREAMER=OFF \
+                -DWITH_GTK=OFF \
+                -DWITH_QT=OFF \
+                -DWITH_V4L=OFF \
+                -DBUILD_ZLIB=ON \
+                -DBUILD_JPEG=ON \
+                -DBUILD_PNG=ON \
+                -DBUILD_WEBP=ON \
+                -DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
+
+              echo "========== BUILD =========="
+              cmake --build . --parallel 2
+
+              echo "========== FIND RESULT =========="
+              find . -name "libopencv_java490.so" -print
+
+              SO_FILE=$(find . -name "libopencv_java490.so" | head -1)
+
+              if [ -z "$SO_FILE" ]; then
+                echo "libopencv_java490.so NOT FOUND"
+                exit 1
+              fi
+
+              cp "$SO_FILE" /work/out/libopencv_java490.so
+
+              echo "========== LDD =========="
+              ldd /work/out/libopencv_java490.so \
+                | tee /work/out/ldd.txt || true
+
+              echo "========== GLIBC REQUIREMENTS =========="
+              strings /work/out/libopencv_java490.so \
+                | grep -o "GLIBC_[0-9.]*" \
+                | sort -Vu \
+                | tee /work/out/glibc-versions.txt || true
+
+              echo "========== RESULT =========="
+              ls -lh /work/out/libopencv_java490.so
+            '
+
+      - name: Upload OpenCV native library
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencv490-glibc217
+          path: out/
