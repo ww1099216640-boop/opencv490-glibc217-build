@@ -257,14 +257,14 @@ jobs:
                 /work/out/libonnxruntime4j_jni.so \
                 | tee /work/out/sha256.txt
 
-              echo "========== BUILD SUCCESS =========="
-              ls -lh /work/out
-            '
+                            echo "========== BUILD SUCCESS =========="
+                            ls -lh /work/out
+                            '
 
-            - name: Upload ONNX Runtime build files
-            if: always()
-            uses: actions/upload-artifact@v4
-            with:
-            name: onnxruntime1192-glibc217
-            path: out/
-            if-no-files-found: warn
+      - name: Upload ONNX Runtime build files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnxruntime1192-glibc217
+          path: out/
+          if-no-files-found: warn
