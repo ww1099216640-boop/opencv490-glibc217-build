@@ -55,14 +55,26 @@ jobs:
                 /work/onnxruntime-src
 
                 echo "========== PATCH EIGEN SHA1 =========="
-                grep -n "e7248b26a1ed53fa030c5c459f7ea095dfd276ac" cmake/deps.txt || true
 
-                sed -i \
-                's/be8be39fdbc6e60e94fa7870b280707069b5b81a/32b145f525a8308d7ab1c09388b2e288312d8eba/g' \
-                cmake/deps.txt
+              DEPS_FILE="/work/onnxruntime-src/cmake/deps.txt"
 
-                echo "========== VERIFY EIGEN PATCH =========="
-                grep -n "e7248b26a1ed53fa030c5c459f7ea095dfd276ac" cmake/deps.txt || true
+            echo "deps file: $DEPS_FILE"
+
+          if [ ! -f "$DEPS_FILE" ]; then
+            echo "ERROR: deps.txt not found"
+          find /work/onnxruntime-src -maxdepth 3 -name "deps.txt" -print
+          exit 1
+          fi
+
+          echo "========== BEFORE PATCH =========="
+          grep -n "e7248b26a1ed53fa030c5c459f7ea095dfd276ac" "$DEPS_FILE"
+
+          sed -i \
+          's/be8be39fdbc6e60e94fa7870b280707069b5b81a/32b145f525a8308d7ab1c09388b2e288312d8eba/g' \
+          "$DEPS_FILE"
+
+          echo "========== AFTER PATCH =========="
+          grep -n "e7248b26a1ed53fa030c5c459f7ea095dfd276ac" "$DEPS_FILE"
 
               cd /work/onnxruntime-src
 
