@@ -24,7 +24,7 @@ jobs:
 
               echo "========== SYSTEM =========="
               cat /etc/redhat-release || true
-              ldd --version | head -1
+              ldd --version
               uname -m
 
               echo "========== INSTALL TOOLS =========="
@@ -91,7 +91,7 @@ jobs:
               echo "========== FIND RESULT =========="
               find . -name "libopencv_java490.so" -print
 
-              SO_FILE=$(find . -name "libopencv_java490.so" | head -1)
+              SO_FILE=$(find . -name "libopencv_java490.so" -print -quit)
 
               if [ -z "$SO_FILE" ]; then
                 echo "libopencv_java490.so NOT FOUND"
