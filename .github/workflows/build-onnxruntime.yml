@@ -1,4 +1,4 @@
-name: Build ONNX Runtime 1.20.0 for GLIBC 2.17
+name: Build ONNX Runtime 1.19.2 for GLIBC 2.17
 
 on:
   workflow_dispatch:
@@ -49,7 +49,7 @@ jobs:
               rm -rf /work/onnxruntime-build
 
               git clone \
-                --branch v1.20.0 \
+                --branch v1.19.2 \
                 --depth 1 \
                 https://github.com/microsoft/onnxruntime.git \
                 /work/onnxruntime-src
