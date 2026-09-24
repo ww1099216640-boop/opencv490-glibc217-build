@@ -50,22 +50,39 @@ jobs:
               python -m pip install --no-cache-dir cmake==3.28.3 ninja==1.11.1.1
 
               echo "========== BUILD ENVIRONMENT =========="
-              ldd --version | sed -n '1p'
-              "$CC" --version | sed -n '1p'
-              "$CXX" --version | sed -n '1p'
-              java -version
-              cmake --version | sed -n '1p'
-              uname -m
-
-            echo "========== CHECK AVX-VNNI COMPILER SUPPORT =========="
-            echo 'int main(void){return 0;}' | "$CC" -x c -mavxvnni -c -o /tmp/avxvnni-test.o -
+            ldd --version | sed -n "1p"
             
-            if [ ! -f /tmp/avxvnni-test.o ]; then
-              echo "ERROR: GCC does not support -mavxvnni"
+            echo "CC=$CC"
+            echo "CXX=$CXX"
+            echo "gcc path=$(command -v gcc)"
+            echo "g++ path=$(command -v g++)"
+            echo "cc path=$(command -v cc)"
+            
+            "$CC" --version | sed -n "1p"
+            "$CXX" --version | sed -n "1p"
+            cc --version | sed -n "1p"
+            
+            java -version
+            cmake --version | sed -n "1p"
+            uname -m
+            
+            echo "========== CHECK AVX-VNNI COMPILER SUPPORT =========="
+            
+            printf "int main(void){return 0;}\n" | "$CC" -x c -mavxvnni -c -o /tmp/avxvnni-gcc-test.o -
+            
+            printf "int main(void){return 0;}\n" | cc -x c -mavxvnni -c -o /tmp/avxvnni-cc-test.o -
+            
+            if [ ! -f /tmp/avxvnni-gcc-test.o ]; then
+              echo "ERROR: CC does not support -mavxvnni"
               exit 1
             fi
 
-          echo "GCC supports -mavxvnni"
+            if [ ! -f /tmp/avxvnni-cc-test.o ]; then
+              echo "ERROR: cc does not support -mavxvnni"
+              exit 1
+            fi
+
+          echo "CC and cc both support -mavxvnni"
 
               echo "========== DOWNLOAD ONNX RUNTIME =========="
               rm -rf /work/onnxruntime-src
@@ -244,10 +261,10 @@ jobs:
               ls -lh /work/out
             '
 
-      - name: Upload ONNX Runtime build files
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-         name: onnxruntime1192-glibc217
-         path: out/
-         if-no-files-found: warn
+            - name: Upload ONNX Runtime build files
+            if: always()
+            uses: actions/upload-artifact@v4
+            with:
+            name: onnxruntime1192-glibc217
+            path: out/
+            if-no-files-found: warn
