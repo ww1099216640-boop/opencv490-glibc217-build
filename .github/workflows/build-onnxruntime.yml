@@ -166,6 +166,7 @@ jobs:
               fi
 
               cp -L "$ORT_SO" /work/out/libonnxruntime.so
+              cp -L "$ORT_SO" /work/out/libonnxruntime.so.1
               cp -L "$JNI_SO" /work/out/libonnxruntime4j_jni.so
 
               echo "========== FILE INFO =========="
